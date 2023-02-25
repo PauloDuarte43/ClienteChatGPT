@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 void main() => runApp(MyApp());
 
@@ -49,6 +50,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _textController = TextEditingController();
   String _responseText = '';
   String _apiKey = "";
+  String _sessionId = Uuid().v4();
 
   final ScrollController _scrollController = ScrollController();
 
@@ -81,6 +83,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final String apiUrl =
         'https://api.openai.com/v1/engines/${_selectedEngine.value}/completions';
     final String prompt = _textController.text;
+    _textController.clear();
     final String requestBody = json.encode({
       'prompt': prompt,
       'max_tokens': 60,
@@ -90,6 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
       "Authorization": "Bearer $_apiKey",
+      'Session-Id': _sessionId
     };
     final http.Response response =
         await http.post(Uri.parse(apiUrl), headers: headers, body: requestBody);
@@ -104,11 +108,6 @@ class _MyHomePageState extends State<MyHomePage> {
         textList.add(_responseText);
       }
     });
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: Duration(milliseconds: 500),
-      curve: Curves.easeOut,
-    );
   }
 
   @override
@@ -228,12 +227,25 @@ class _MyHomePageState extends State<MyHomePage> {
                         color: isMinhaMensagem ? Colors.blue : Colors.grey[300],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        mensagem,
-                        style: TextStyle(
-                            color:
-                                isMinhaMensagem ? Colors.white : Colors.black),
+                      child: TyperAnimatedTextKit(
+                        text: [mensagem],
+                        isRepeatingAnimation: false,
+                        repeatForever: false,
+                        totalRepeatCount: 1,
+                        onFinished: () {
+                          _scrollController.animateTo(
+                            _scrollController.position.maxScrollExtent,
+                            duration: Duration(milliseconds: 500),
+                            curve: Curves.easeOut,
+                          );
+                        },
                       ),
+                      // child: Text(
+                      //   mensagem,
+                      //   style: TextStyle(
+                      //       color:
+                      //           isMinhaMensagem ? Colors.white : Colors.black),
+                      // ),
                     ),
                   );
                 },
