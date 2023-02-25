@@ -80,34 +80,37 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
 
-    final String apiUrl =
-        'https://api.openai.com/v1/engines/${_selectedEngine.value}/completions';
     final String prompt = _textController.text;
-    _textController.clear();
-    final String requestBody = json.encode({
-      'prompt': prompt,
-      'max_tokens': 60,
-      'n': 1,
-      'stop': ['\n']
-    });
-    final Map<String, String> headers = {
-      'Content-Type': 'application/json',
-      "Authorization": "Bearer $_apiKey",
-      'Session-Id': _sessionId
-    };
-    final http.Response response =
-        await http.post(Uri.parse(apiUrl), headers: headers, body: requestBody);
-    final Map<String, dynamic> responseData = json.decode(response.body);
-    setState(() {
-      try {
-        textList.add(prompt);
-        _responseText = responseData['choices'][0]['text'];
-        textList.add(_responseText);
-      } catch (e) {
-        _responseText = responseData['error']['message'];
-        textList.add(_responseText);
-      }
-    });
+
+    if (prompt.isNotEmpty) {
+      final String apiUrl =
+          'https://api.openai.com/v1/engines/${_selectedEngine.value}/completions';
+      _textController.clear();
+      final String requestBody = json.encode({
+        'prompt': prompt,
+        'max_tokens': 60,
+        'n': 1,
+        'stop': ['\n']
+      });
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        "Authorization": "Bearer $_apiKey",
+        'Session-Id': _sessionId
+      };
+      final http.Response response = await http.post(Uri.parse(apiUrl),
+          headers: headers, body: requestBody);
+      final Map<String, dynamic> responseData = json.decode(response.body);
+      setState(() {
+        try {
+          textList.add(prompt);
+          _responseText = responseData['choices'][0]['text'];
+          textList.add(_responseText);
+        } catch (e) {
+          _responseText = responseData['error']['message'];
+          textList.add(_responseText);
+        }
+      });
+    }
   }
 
   @override
