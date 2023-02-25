@@ -1,7 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.tec.pauloduarte.chatgpt.jarvis">
+	package="br.tec.pauloduarte.chatgpt.jarvis">
+
+   <uses-permission android:name="android.permission.INTERNET" />
+
    <application
-        android:label="jarvis"
+        android:label="Cliente ChatGPT"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/services.dart';
 
 void main() => runApp(MyApp());
 
@@ -83,6 +84,8 @@ class _MyHomePageState extends State<MyHomePage> {
     final String prompt = _textController.text;
 
     if (prompt.isNotEmpty) {
+      SystemChannels.textInput.invokeMethod('TextInput.hide');
+      FocusScope.of(context).requestFocus(new FocusNode());
       final String apiUrl =
           'https://api.openai.com/v1/engines/${_selectedEngine.value}/completions';
       _textController.clear();
@@ -176,40 +179,6 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: TextField(
-                controller: _textController,
-                keyboardType: TextInputType.multiline,
-                maxLines: null,
-                decoration: InputDecoration(
-                  hintText: 'Digite seu texto aqui',
-                ),
-              ),
-            ),
-            SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: _sendText,
-              child: Text('Enviar'),
-            ),
-            DropdownButton<EngineOption>(
-              value: _selectedEngine,
-              onChanged: (EngineOption? option) {
-                if (option != null) {
-                  setState(() {
-                    _selectedEngine = option;
-                  });
-                }
-              },
-              items: _engineOptions
-                  .map<DropdownMenuItem<EngineOption>>((EngineOption option) {
-                return DropdownMenuItem<EngineOption>(
-                  value: option,
-                  child: Text(option.label),
-                );
-              }).toList(),
-            ),
-            SizedBox(height: 16.0),
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
@@ -253,6 +222,40 @@ class _MyHomePageState extends State<MyHomePage> {
                   );
                 },
               ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: TextField(
+                controller: _textController,
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: 'Digite seu texto aqui',
+                ),
+              ),
+            ),
+            SizedBox(height: 16.0),
+            ElevatedButton(
+              onPressed: _sendText,
+              child: Text('Enviar'),
+            ),
+            SizedBox(height: 16.0),
+            DropdownButton<EngineOption>(
+              value: _selectedEngine,
+              onChanged: (EngineOption? option) {
+                if (option != null) {
+                  setState(() {
+                    _selectedEngine = option;
+                  });
+                }
+              },
+              items: _engineOptions
+                  .map<DropdownMenuItem<EngineOption>>((EngineOption option) {
+                return DropdownMenuItem<EngineOption>(
+                  value: option,
+                  child: Text(option.label),
+                );
+              }).toList(),
             ),
             // Text(_responseText),
           ],
