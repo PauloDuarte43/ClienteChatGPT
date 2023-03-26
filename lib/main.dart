@@ -28,6 +28,8 @@ List<EngineOption> _engineOptions = [
   EngineOption('Curie', 'curie'),
   EngineOption('Babbage', 'babbage'),
   EngineOption('Ada', 'ada'),
+  EngineOption('gpt-3.5-turbo', 'gpt-3.5-turbo'),
+  EngineOption('gpt-4', 'gpt-4')
 ];
 
 class MyApp extends StatelessWidget {
@@ -68,12 +70,14 @@ class _MyHomePageState extends State<MyHomePage> {
     'text-davinci-003': {
       'description':
           'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
-      'max_tokens': 2048
+      'max_tokens': 4097
     },
+    'gpt-4': {'description': 'gpt-4.', 'max_tokens': 8192},
+    'gpt-3.5-turbo': {'description': 'gpt-3.5-turbo.', 'max_tokens': 4096},
     'text-davinci-002': {
       'description':
           'Uma versão anterior do modelo Davinci que ainda está disponível para fins de compatibilidade, mas é menos poderosa do que a versão atual.',
-      'max_tokens': 2048
+      'max_tokens': 4096
     },
     'text-curie-001': {
       'description':
@@ -488,7 +492,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                   600,
                                   800,
                                   1600,
-                                  2048
+                                  2048,
+                                  4096,
+                                  8192
                                 ].map<DropdownMenuItem<int>>((int value) {
                                   return DropdownMenuItem<int>(
                                     value: value,
