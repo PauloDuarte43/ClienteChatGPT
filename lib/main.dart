@@ -62,29 +62,60 @@ class _MyHomePageState extends State<MyHomePage> {
   final Uri _url = Uri.parse('https://platform.openai.com/account/api-keys');
 
   final ScrollController _scrollController = ScrollController();
+  Utf8Decoder decoder = const Utf8Decoder();
 
-  Map<String, String> models = {
-    'text-davinci-003':
-        'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
-    'text-davinci-002':
-        'Uma versão anterior do modelo Davinci que ainda está disponível para fins de compatibilidade, mas é menos poderosa do que a versão atual.',
-    'text-curie-001':
-        'Um modelo menor e mais rápido que o Davinci, mas ainda capaz de gerar texto coerente e útil.',
-    'text-babbage-001':
-        'Um modelo menor do que o Curie, adequado para tarefas mais simples de geração de texto.',
-    'text-ada-001':
-        'Um modelo menor e mais rápido do que o Babbage, adequado para tarefas básicas de geração de texto.',
-    'davinci':
-        'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
-    'curie':
-        'Um modelo menor e mais rápido que o Davinci, mas ainda capaz de gerar texto coerente e útil.',
-    'babbage':
-        'Um modelo menor do que o Curie, adequado para tarefas mais simples de geração de texto.',
-    'ada':
-        'Um modelo menor e mais rápido do que o Babbage, adequado para tarefas básicas de geração de texto.',
+  Map<String, Map<String, dynamic>> models = {
+    'text-davinci-003': {
+      'description':
+          'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
+      'max_tokens': 2048
+    },
+    'text-davinci-002': {
+      'description':
+          'Uma versão anterior do modelo Davinci que ainda está disponível para fins de compatibilidade, mas é menos poderosa do que a versão atual.',
+      'max_tokens': 2048
+    },
+    'text-curie-001': {
+      'description':
+          'Um modelo menor e mais rápido que o Davinci, mas ainda capaz de gerar texto coerente e útil.',
+      'max_tokens': 2048
+    },
+    'text-babbage-001': {
+      'description':
+          'Um modelo menor do que o Curie, adequado para tarefas mais simples de geração de texto.',
+      'max_tokens': 1024
+    },
+    'text-ada-001': {
+      'description':
+          'Um modelo menor e mais rápido do que o Babbage, adequado para tarefas básicas de geração de texto.',
+      'max_tokens': 1024
+    },
+    'davinci': {
+      'description':
+          'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
+      'max_tokens': 2048
+    },
+    'curie': {
+      'description':
+          'Um modelo menor e mais rápido que o Davinci, mas ainda capaz de gerar texto coerente e útil.',
+      'max_tokens': 2048
+    },
+    'babbage': {
+      'description':
+          'Um modelo menor do que o Curie, adequado para tarefas mais simples de geração de texto.',
+      'max_tokens': 1024
+    },
+    'ada': {
+      'description':
+          'Um modelo menor e mais rápido do que o Babbage, adequado para tarefas básicas de geração de texto.',
+      'max_tokens': 1024
+    }
   };
 
   List<String> textList = ['Olá! Como posso ajudar?'];
+
+  int selectedMaxTokens = 200;
+  String finishReason = "";
 
   EngineOption _selectedEngine = _engineOptions.first;
 
@@ -140,26 +171,33 @@ class _MyHomePageState extends State<MyHomePage> {
       FocusScope.of(context).requestFocus(FocusNode());
       const String apiUrl = 'https://api.openai.com/v1/completions';
       // 'https://api.openai.com/v1/engines/${_selectedEngine.value}/completions';
+      int maxTokens =
+          selectedMaxTokens <= models[_selectedEngine.value]!['max_tokens']
+              ? selectedMaxTokens
+              : models[_selectedEngine.value]!['max_tokens'];
       _textController.clear();
       final String requestBody = json.encode({
         "model": _selectedEngine.value,
         'prompt': prompt,
-        'max_tokens': 60,
-        'n': 1,
-        'stop': ['\n']
+        'max_tokens': maxTokens,
+        'n': 1
       });
       final Map<String, String> headers = {
         'Content-Type': 'application/json',
         "Authorization": "Bearer $_apiKey",
         'Session-Id': _sessionId
       };
+
       final http.Response response = await http.post(Uri.parse(apiUrl),
           headers: headers, body: requestBody);
       final Map<String, dynamic> responseData = json.decode(response.body);
+
       setState(() {
         try {
           textList.add(prompt);
           _responseText = responseData['choices'][0]['text'];
+          finishReason = responseData['choices'][0]['finish_reason'];
+          _responseText = decoder.convert(_responseText.codeUnits);
           textList.add(_responseText);
         } catch (e) {
           _responseText = responseData['error']['message'];
@@ -378,45 +416,96 @@ class _MyHomePageState extends State<MyHomePage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          DropdownButton<EngineOption>(
-                            value: _selectedEngine,
-                            onChanged: (EngineOption? option) {
-                              if (option != null) {
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: Text(
-                                          'Você selecionou o modelo ${option.label}'),
-                                      content: Text(models[option.value]!),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                          child: Text('Fechar'),
-                                        ),
-                                      ],
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Modelo',
+                                style: TextStyle(fontSize: 10.0),
+                              ),
+                              DropdownButton<EngineOption>(
+                                value: _selectedEngine,
+                                onChanged: (EngineOption? option) {
+                                  if (option != null) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: Text(
+                                              'Você selecionou o modelo ${option.label}'),
+                                          content: Text(models[option.value]![
+                                              'description']),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.of(context).pop();
+                                              },
+                                              child: const Text('Fechar'),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     );
-                                  },
-                                );
-                                setState(() {
-                                  _selectedEngine = option;
-                                });
-                              }
-                            },
-                            items: _engineOptions
-                                .map<DropdownMenuItem<EngineOption>>(
-                                    (EngineOption option) {
-                              return DropdownMenuItem<EngineOption>(
-                                value: option,
-                                child: Text(option.label),
-                              );
-                            }).toList(),
+                                    setState(() {
+                                      _selectedEngine = option;
+                                    });
+                                  }
+                                },
+                                items: _engineOptions
+                                    .map<DropdownMenuItem<EngineOption>>(
+                                        (EngineOption option) {
+                                  return DropdownMenuItem<EngineOption>(
+                                    value: option,
+                                    child: Text(option.label),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ),
-                          ElevatedButton(
-                            onPressed: _sendText,
-                            child: const Text('Enviar'),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Max. Tokens',
+                                style: TextStyle(fontSize: 10.0),
+                              ),
+                              DropdownButton<int>(
+                                value: selectedMaxTokens,
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedMaxTokens = value!;
+                                  });
+                                },
+                                items: <int>[
+                                  50,
+                                  80,
+                                  100,
+                                  150,
+                                  200,
+                                  400,
+                                  600,
+                                  800,
+                                  1600,
+                                  2048
+                                ].map<DropdownMenuItem<int>>((int value) {
+                                  return DropdownMenuItem<int>(
+                                    value: value,
+                                    child: Text(value.toString()),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              Text(finishReason),
+                              ElevatedButton(
+                                onPressed: _sendText,
+                                child: const Text('Enviar'),
+                              ),
+                            ],
                           ),
                         ],
                       ),
