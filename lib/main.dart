@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:animated_text_kit/animated_text_kit.dart';
+// import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart' as md;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 void main() => runApp(const MyApp());
 
@@ -19,17 +22,12 @@ class EngineOption {
 }
 
 List<EngineOption> _engineOptions = [
-  EngineOption('Davinci 3', 'text-davinci-003'),
-  EngineOption('Davinci 2', 'text-davinci-002'),
-  EngineOption('Curie', 'text-curie-001'),
-  EngineOption('Babbage', 'text-babbage-001'),
-  EngineOption('Ada', 'text-ada-001'),
-  EngineOption('Davinci', 'davinci'),
-  EngineOption('Curie', 'curie'),
-  EngineOption('Babbage', 'babbage'),
-  EngineOption('Ada', 'ada'),
   EngineOption('gpt-3.5-turbo', 'gpt-3.5-turbo'),
-  EngineOption('gpt-4', 'gpt-4')
+  EngineOption('gpt-3.5-turbo-0301', 'gpt-3.5-turbo-0301'),
+  EngineOption('gpt-4', 'gpt-4'),
+  EngineOption('gpt-4-0314', 'gpt-4-0314'),
+  EngineOption('gpt-4-32k', 'gpt-4-32k'),
+  EngineOption('gpt-4-32k-0314', 'gpt-4-32k-0314')
 ];
 
 class MyApp extends StatelessWidget {
@@ -58,6 +56,10 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _textController = TextEditingController();
+  late Map<String, dynamic> _response;
+  bool _isLoading = false;
+  bool _scrool = false;
+  int tokens = 0;
   String _responseText = '';
   String _apiKey = "";
   final String _sessionId = const Uuid().v4();
@@ -67,56 +69,45 @@ class _MyHomePageState extends State<MyHomePage> {
   Utf8Decoder decoder = const Utf8Decoder();
 
   Map<String, Map<String, dynamic>> models = {
-    'text-davinci-003': {
+    'gpt-3.5-turbo': {
       'description':
-          'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
-      'max_tokens': 4097
-    },
-    'gpt-4': {'description': 'gpt-4.', 'max_tokens': 8192},
-    'gpt-3.5-turbo': {'description': 'gpt-3.5-turbo.', 'max_tokens': 4096},
-    'text-davinci-002': {
-      'description':
-          'Uma versão anterior do modelo Davinci que ainda está disponível para fins de compatibilidade, mas é menos poderosa do que a versão atual.',
+          'Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003. Will be updated with our latest model iteration.',
       'max_tokens': 4096
     },
-    'text-curie-001': {
+    'gpt-3.5-turbo-0301': {
       'description':
-          'Um modelo menor e mais rápido que o Davinci, mas ainda capaz de gerar texto coerente e útil.',
-      'max_tokens': 2048
+          'Snapshot of gpt-3.5-turbo from March 1st 2023. Unlike gpt-3.5-turbo, this model will not receive updates, and will only be supported for a three month period ending on June 1st 2023',
+      'max_tokens': 4096
     },
-    'text-babbage-001': {
+    'gpt-4': {
       'description':
-          'Um modelo menor do que o Curie, adequado para tarefas mais simples de geração de texto.',
-      'max_tokens': 1024
+          'More capable than any GPT-3.5 model, able to do more complex tasks, and optimized for chat. Will be updated with our latest model iteration.',
+      'max_tokens': 8192
     },
-    'text-ada-001': {
+    'gpt-4-0314': {
       'description':
-          'Um modelo menor e mais rápido do que o Babbage, adequado para tarefas básicas de geração de texto.',
-      'max_tokens': 1024
+          'Snapshot of gpt-4 from March 14th 2023. Unlike gpt-4, this model will not receive updates, and will only be supported for a three month period ending on June 14th 2023.',
+      'max_tokens': 8192
     },
-    'davinci': {
+    'gpt-4-32k': {
       'description':
-          'O modelo mais poderoso e versátil do ChatGPT, adequado para várias tarefas, incluindo geração de texto, tradução de idiomas, resumo de texto e muito mais.',
-      'max_tokens': 2048
+          'Same capabilities as the base gpt-4 mode but with 4x the context length. Will be updated with our latest model iteration.',
+      'max_tokens': 32768
     },
-    'curie': {
+    'gpt-4-32k-0314': {
       'description':
-          'Um modelo menor e mais rápido que o Davinci, mas ainda capaz de gerar texto coerente e útil.',
-      'max_tokens': 2048
+          'Snapshot of gpt-4-32 from March 14th 2023. Unlike gpt-4-32k, this model will not receive updates, and will only be supported for a three month period ending on June 14th 2023.',
+      'max_tokens': 32768
     },
-    'babbage': {
-      'description':
-          'Um modelo menor do que o Curie, adequado para tarefas mais simples de geração de texto.',
-      'max_tokens': 1024
-    },
-    'ada': {
-      'description':
-          'Um modelo menor e mais rápido do que o Babbage, adequado para tarefas básicas de geração de texto.',
-      'max_tokens': 1024
-    }
   };
-
-  List<String> textList = ['Olá! Como posso ajudar?'];
+  List<List<Map<String, dynamic>>> listChatGPTAssistant = [];
+  List<Map<String, dynamic>> chatGPTAssistant = [
+    {
+      'role': 'assistant',
+      'content':
+          'Eu sou o assistente ChatGPT, estou aqui para responder qualquer pergunta!',
+    },
+  ];
 
   int selectedMaxTokens = 200;
   String finishReason = "";
@@ -130,6 +121,19 @@ class _MyHomePageState extends State<MyHomePage> {
     )) {
       throw Exception('Não foi possível abrir $url');
     }
+  }
+
+  Future<void> _clearContext() async {
+    await saveChatGPTAssistant();
+    setState(() {
+      chatGPTAssistant = [
+        {
+          'role': 'assistant',
+          'content':
+              'Eu sou o assistente ChatGPT, estou aqui para responder qualquer pergunta!',
+        },
+      ];
+    });
   }
 
   Future<void> _sendText() async {
@@ -173,19 +177,41 @@ class _MyHomePageState extends State<MyHomePage> {
     if (prompt.isNotEmpty) {
       SystemChannels.textInput.invokeMethod('TextInput.hide');
       FocusScope.of(context).requestFocus(FocusNode());
-      const String apiUrl = 'https://api.openai.com/v1/completions';
-      // 'https://api.openai.com/v1/engines/${_selectedEngine.value}/completions';
+
+      const String apiUrl = 'https://api.openai.com/v1/chat/completions';
+
       int maxTokens =
           selectedMaxTokens <= models[_selectedEngine.value]!['max_tokens']
               ? selectedMaxTokens
               : models[_selectedEngine.value]!['max_tokens'];
+
       _textController.clear();
-      final String requestBody = json.encode({
+      setState(() {
+        _isLoading = true;
+        _scrool = false;
+
+        chatGPTAssistant.add(
+          {
+            'role': 'user',
+            'content': prompt,
+          },
+        );
+        Timer(const Duration(seconds: 1), () {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        });
+      });
+      late String requestBody;
+      requestBody = json.encode({
         "model": _selectedEngine.value,
-        'prompt': prompt,
+        'messages': chatGPTAssistant,
         'max_tokens': maxTokens,
         'n': 1
       });
+
       final Map<String, String> headers = {
         'Content-Type': 'application/json',
         "Authorization": "Bearer $_apiKey",
@@ -194,27 +220,74 @@ class _MyHomePageState extends State<MyHomePage> {
 
       final http.Response response = await http.post(Uri.parse(apiUrl),
           headers: headers, body: requestBody);
+
       final Map<String, dynamic> responseData = json.decode(response.body);
 
       setState(() {
+        _isLoading = false;
         try {
-          textList.add(prompt);
-          _responseText = responseData['choices'][0]['text'];
-          finishReason = responseData['choices'][0]['finish_reason'];
+          _response = responseData['choices'][0];
+          tokens = responseData['usage']['total_tokens'];
+          finishReason = _response['finish_reason'];
+          _responseText = _response['message']['content'];
           _responseText = decoder.convert(_responseText.codeUnits);
-          textList.add(_responseText);
+
+          chatGPTAssistant.add({
+            'role': 'assistant',
+            'content': _responseText,
+          });
+          Timer(const Duration(seconds: 1), () {
+            // Animar a posição do scroll para o final da lista
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+          });
         } catch (e) {
-          _responseText = responseData['error']['message'];
-          textList.add(_responseText);
+          try {
+            _responseText = responseData['error']['message'];
+            showPopUp('Ops!!!', _responseText);
+          } catch (e) {
+            _responseText = '$e';
+            showPopUp('Erro desconhecido!', _responseText);
+          }
         }
       });
     }
+  }
+
+  void showPopUp(String title, String body) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Fechar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   void initState() {
     super.initState();
     _loadApiKey();
+    loadChatGPTAssistant();
+  }
+
+  @override
+  void dispose() {
+    saveChatGPTAssistant();
+    super.dispose();
   }
 
   Future<void> _loadApiKey() async {
@@ -223,6 +296,23 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _apiKey = apiKey;
     });
+  }
+
+  Future<void> saveChatGPTAssistant() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    listChatGPTAssistant.add(chatGPTAssistant);
+    final String json = jsonEncode(listChatGPTAssistant);
+    await prefs.setString('listChatGPTAssistant', json);
+  }
+
+  Future<void> loadChatGPTAssistant() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String json = prefs.getString('listChatGPTAssistant') ?? '[]';
+    final List<dynamic> jsonList = jsonDecode(json);
+    listChatGPTAssistant = jsonList
+        .map<List<Map<String, dynamic>>>(
+            (json) => List<Map<String, dynamic>>.from(json))
+        .toList();
   }
 
   Future<void> _updateApiKey() async {
@@ -287,10 +377,12 @@ class _MyHomePageState extends State<MyHomePage> {
                       Expanded(
                         child: ListView.builder(
                           controller: _scrollController,
-                          itemCount: textList.length,
+                          itemCount: chatGPTAssistant.length,
                           itemBuilder: (BuildContext context, int index) {
-                            String mensagem = textList[index];
-                            bool isMinhaMensagem = index % 2 == 0;
+                            Map<String, dynamic> mensagem =
+                                chatGPTAssistant[index];
+                            bool isMinhaMensagem =
+                                mensagem['role'] == 'assistant';
 
                             return Container(
                               alignment: isMinhaMensagem
@@ -316,45 +408,51 @@ class _MyHomePageState extends State<MyHomePage> {
                                         width:
                                             MediaQuery.of(context).size.width -
                                                 120,
-                                        child: AnimatedTextKit(
-                                          animatedTexts: [
-                                            TypewriterAnimatedText(
-                                              mensagem,
-                                            ),
-                                          ],
-                                          totalRepeatCount: 1,
-                                          isRepeatingAnimation: false,
-                                          repeatForever: false,
-                                          onFinished: () {
-                                            _scrollController.animateTo(
-                                              _scrollController
-                                                  .position.maxScrollExtent,
-                                              duration: const Duration(
-                                                  milliseconds: 500),
-                                              curve: Curves.easeOut,
-                                            );
-                                          },
+                                        child: md.MarkdownBody(
+                                          data: mensagem['content'],
                                         ),
+                                        // child: AnimatedTextKit(
+                                        //   animatedTexts: [
+                                        //     TypewriterAnimatedText(
+                                        //       mensagem['content'],
+                                        //     ),
+                                        //   ],
+                                        //   totalRepeatCount: 1,
+                                        //   isRepeatingAnimation: false,
+                                        //   repeatForever: false,
+                                        //   onFinished: () {
+                                        //     if (!_scrool) {
+                                        //       _scrollController.animateTo(
+                                        //         _scrollController
+                                        //             .position.maxScrollExtent,
+                                        //         duration: const Duration(
+                                        //             milliseconds: 500),
+                                        //         curve: Curves.easeOut,
+                                        //       );
+                                        //       setState(() {
+                                        //         _scrool = true;
+                                        //       });
+                                        //     }
+                                        //   },
+                                        // ),
                                       ),
                                     ),
-                                    isMinhaMensagem
-                                        ? IconButton(
-                                            icon: const Icon(Icons.copy),
-                                            onPressed: () {
-                                              // código a ser executado quando o botão é pressionado
-                                              // if (Platform.isIOS || Platform.isAndroid) {
-                                              Clipboard.setData(ClipboardData(
-                                                  text: mensagem));
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(const SnackBar(
-                                                duration: Duration(seconds: 1),
-                                                content: Text(
-                                                    'Texto copiado para a área de transferência'),
-                                              ));
-                                              // } else {}
-                                            },
-                                          )
-                                        : const SizedBox.shrink()
+                                    IconButton(
+                                      icon: const Icon(Icons.copy),
+                                      onPressed: () {
+                                        // código a ser executado quando o botão é pressionado
+                                        // if (Platform.isIOS || Platform.isAndroid) {
+                                        Clipboard.setData(ClipboardData(
+                                            text: mensagem['content']));
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          duration: Duration(seconds: 1),
+                                          content: Text(
+                                              'Texto copiado para a área de transferência'),
+                                        ));
+                                        // } else {}
+                                      },
+                                    ),
                                   ],
                                 ),
                                 // IconButton(
@@ -494,7 +592,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                   1600,
                                   2048,
                                   4096,
-                                  8192
+                                  8192,
+                                  32768
                                 ].map<DropdownMenuItem<int>>((int value) {
                                   return DropdownMenuItem<int>(
                                     value: value,
@@ -506,10 +605,31 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                           Column(
                             children: [
+                              Text(
+                                'Tokens: $tokens',
+                                style: const TextStyle(fontSize: 10.0),
+                              ),
                               Text(finishReason),
-                              ElevatedButton(
-                                onPressed: _sendText,
-                                child: const Text('Enviar'),
+                              Row(
+                                children: [
+                                  ElevatedButton(
+                                    onPressed: _sendText,
+                                    child: const Text('Enviar'),
+                                  ),
+                                  IconButton(
+                                    iconSize: 16.0,
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: _clearContext,
+                                  ),
+                                  _isLoading
+                                      ? const Center(
+                                          child: SpinKitCircle(
+                                            color: Colors.blue,
+                                            size: 15.0,
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ],
                               ),
                             ],
                           ),
@@ -521,6 +641,41 @@ class _MyHomePageState extends State<MyHomePage> {
                 );
               },
             ),
+          ),
+        ),
+        drawer: Drawer(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              const DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                ),
+                child: Center(
+                  child: Text(
+                    'Histórico de Conversas',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 25.0),
+                  ),
+                ),
+              ),
+              for (var item in listChatGPTAssistant)
+                if (item.length > 1)
+                  ListTile(
+                    title: Text(item[1]['content'].length >= 15
+                        ? item[1]['content'].substring(0, 15)
+                        : item[1]['content']),
+                    leading: const Icon(Icons.history_edu_outlined),
+                    onTap: () {
+                      saveChatGPTAssistant();
+                      setState(() {
+                        chatGPTAssistant = item;
+                        listChatGPTAssistant.remove(item);
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+            ],
           ),
         ),
         floatingActionButton: Stack(
