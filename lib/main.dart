@@ -60,6 +60,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoading = false;
   bool _scrool = false;
   int tokens = 0;
+  double _temperature = 1;
   String _responseText = '';
   String _apiKey = "";
   final String _sessionId = const Uuid().v4();
@@ -109,7 +110,7 @@ class _MyHomePageState extends State<MyHomePage> {
     },
   ];
 
-  int selectedMaxTokens = 200;
+  int selectedMaxTokens = 600;
   String finishReason = "";
 
   EngineOption _selectedEngine = _engineOptions.first;
@@ -209,7 +210,8 @@ class _MyHomePageState extends State<MyHomePage> {
         "model": _selectedEngine.value,
         'messages': chatGPTAssistant,
         'max_tokens': maxTokens,
-        'n': 1
+        'n': 1,
+        'temperature': double.parse(_temperature.toStringAsFixed(2))
       });
 
       final Map<String, String> headers = {
@@ -393,7 +395,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 margin: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: isMinhaMensagem
-                                      ? Colors.blue
+                                      ? Colors.brown[200]
                                       : Colors.grey[300],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -409,7 +411,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                             MediaQuery.of(context).size.width -
                                                 120,
                                         child: md.MarkdownBody(
+                                          selectable: true,
                                           data: mensagem['content'],
+                                          styleSheet: md.MarkdownStyleSheet(
+                                            a: const TextStyle(
+                                              color: Colors.black,
+                                            ),
+                                          ),
                                         ),
                                         // child: AnimatedTextKit(
                                         //   animatedTexts: [
@@ -516,6 +524,29 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       const SizedBox(height: 16.0),
                       Row(
+                        children: [
+                          const Expanded(
+                            flex: 1,
+                            child: Text('Temp.:'),
+                          ),
+                          Expanded(
+                            flex: 9,
+                            child: Slider(
+                              value: _temperature,
+                              max: 2,
+                              onChanged: (double value) {
+                                setState(() {
+                                  _temperature = value;
+                                });
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(_temperature.toStringAsFixed(2)),
+                          ),
+                        ],
+                      ),
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           Column(
@@ -591,8 +622,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                   800,
                                   1600,
                                   2048,
+                                  4000,
                                   4096,
+                                  8000,
                                   8192,
+                                  9000,
+                                  10000,
                                   32768
                                 ].map<DropdownMenuItem<int>>((int value) {
                                   return DropdownMenuItem<int>(
@@ -662,9 +697,24 @@ class _MyHomePageState extends State<MyHomePage> {
               for (var item in listChatGPTAssistant)
                 if (item.length > 1)
                   ListTile(
-                    title: Text(item[1]['content'].length >= 15
-                        ? item[1]['content'].substring(0, 15)
-                        : item[1]['content']),
+                    title: Row(
+                      children: [
+                        Text(
+                          item[1]['content'].length >= 15
+                              ? item[1]['content'].substring(0, 15)
+                              : item[1]['content'],
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () {
+                            setState(() {
+                              listChatGPTAssistant.remove(item);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                     leading: const Icon(Icons.history_edu_outlined),
                     onTap: () {
                       saveChatGPTAssistant();
